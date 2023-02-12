@@ -25,10 +25,9 @@
                     <input type="submit" value="Send">
                     </form>
                     <?php 
+                            echo Auth::user()->name;
+
                             
-                            $id = Auth::id();
-                            $name = DB::table('users')->where('id', $id)->value('name');
-                            echo $name;
                         ?>
                     <script>
                         console.log("test");

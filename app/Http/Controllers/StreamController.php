@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Message;
+use DB;
 
 class StreamController extends Controller
 {
@@ -25,13 +27,13 @@ class StreamController extends Controller
         header("Access-Control-Allow-Origin: *");
         
         $prvic = true;
-        $conn = pg_pconnect("dbname=chat user=postgres password=postgres");
-        
+        $conn = pg_pconnect("dbname=chat user=postgres password=postgres");   
+
         if (!$conn) {
             echo "An error occurred.\n";
             exit;
         }
-        
+
         while (true) {
             pg_query($conn, 'LISTEN messages;');
             $notify = pg_get_notify($conn);
@@ -40,6 +42,7 @@ class StreamController extends Controller
 
             //echo 'data: ' . stripslashes(json_encode($notify));
             //echo "\n\n";
+            /*
             $sql = "SELECT u.name as username, m.message as msg, u.id as id FROM messages m
             LEFT JOIN users u ON m.iduser = id ORDER BY idmsg ASC";
             $sql1 = "SELECT u.name as username, m.message as msg, u.id as id FROM messages m
@@ -47,26 +50,45 @@ class StreamController extends Controller
 
             $result=pg_query($conn, $sql1);
             $result2=pg_query($conn, $sql);
+            */         
 
             if($prvic){
-                while($row2 = pg_fetch_assoc($result2)){ 
-                    echo 'data: {"id": "' . $row2['id'] . '", "username": "' . $row2['username'] . '", "msg": "' . $row2['msg'] . '"}' . "\n\n"; 
+                //vsa sporočila iz baze
+                $entireTable = DB::table('messages')
+                ->leftjoin('users', 'messages.iduser', '=', 'users.id')
+                ->select('users.name AS username', 'messages.message AS msg', 'users.id AS userid')
+                ->orderBy('messages.idmsg', 'asc')->get();
+
+                foreach ($entireTable as $row1) {
+                    echo 'data: {"id": "' . $row1->userid . '", "username": "' . $row1->username . '", "msg": "' . $row1->msg . '"}' . "\n\n";
                 }
+                
                 ob_flush();
                 flush();
                 $prvic=false;
             }
 
             if (!$notify) {
-            //echo 'heartbeat' . "\n\n";
+                //echo 'heartbeat' . "\n\n";
             } else {  
-                    while($row = pg_fetch_assoc($result)){ 
-                    //echo 'data:' . $row['username'] . ': ' . $row['msg'] . ' ' . $row['id'] . "\n\n";
-                    echo 'data: {"id": "' . $row['id'] . '", "username": "' . $row['username'] . '", "msg": "' . $row['msg'] . '"}' . "\n\n";
-                    
-                }
-            ob_flush();
-            flush();
+                //najnovejšo sporočilo iz baze
+                $latestMsg = Message::latest('idmsg')->first();
+
+                /*$latestMsg = DB::table('messages')
+                ->leftjoin('users', 'messages.iduser', '=', 'users.id')
+                ->select('users.name AS username', 'messages.message AS msg', 'users.id AS userid')
+                ->orderBy('messages.idmsg', 'desc')->take(1)->get();*/
+                
+                $id =  $latestMsg->iduser;
+                $user = DB::table('users')->where('id', $id)->first();
+                $username = $user->name;
+                echo 'data: {"id": "' . $latestMsg->iduser . '", "username": "' . $username . '", "msg": "' . $latestMsg->message . '"}' . "\n\n";
+                //echo 'data: {"id": "' . $latestMsg->iduser . '", "msg": "' . $latestMsg->message . '"}' . "\n\n";
+                
+                //echo 'data: {"username": "test", "msg": "xd"}' . "\n\n";
+                
+                ob_flush();
+                flush();
             
             }
             
